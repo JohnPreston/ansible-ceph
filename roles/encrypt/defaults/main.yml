@@ -1,0 +1,3 @@
+
+encrypt_key_size: 512
+encrpyt_key_folder: /var/tmp/

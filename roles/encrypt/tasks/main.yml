@@ -1,0 +1,18 @@
+# Encrypt disks with LUCK
+
+- name: Install pre-requesites
+  yum: name={{ item }} state=latest
+  with_items:
+  - cryptsetup
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+- name: Generate encryption file
+  shell: dd bs={{ encrypt_key_size }} count=4 if=/dev/urandom of={{ encrpyt_key_folder }}/{{ key_file }} iflag=fullblock
+  when: use_same_encrypt_key
+
+- name: Generate encryption file(s)
+  shell: dd bs={{ encrypt_key_size }} count=4 if=/dev/urandom of={{ encrpyt_key_folder }}/{{ item }}-key iflag=fullblock
+  with_items:
+  - "{{ drives }}"
+  when: not use_same_encrypt_key
+
