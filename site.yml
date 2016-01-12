@@ -1,0 +1,8 @@
+
+- hosts:
+  - ceph
+  roles:
+  - encrypt
+  vars_files:
+  - vars/disks.yml
+

@@ -1,0 +1,29 @@
+#
+#
+#
+
+- name: Create OSD partition
+  shell: parted -s /dev/{{ item }} mklabel gpt mkpart primary 1MB 100%
+  with_items:
+  - "{{ osds }}"
+  ignore_errors: True
+  tags:
+  - osds
+  - format
+
+- name: Create Journal primary partitions
+  shell: parted -s /dev/{{ item }} mklabel gpt mkpart primary 1MB 25G
+  with_items:
+  - "{{ journals }}"
+  tags:
+  - journals
+  - format
+
+- name: Create multiple partitions for journals
+  shell: parted -s /dev/{{ item.0 }} mkpart extended {{ item.1['start'] }} {{ item.1['end'] }}
+  with_nested:
+  - "{{ journals }}"
+  - [ {'start': "25G", 'end': "50G"}, {'start': "50G", 'end': "75G"}, {'start': "75G", 'end': "100G"} ]
+  tags:
+  - journals
+  - format

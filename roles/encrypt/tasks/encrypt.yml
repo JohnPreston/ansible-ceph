@@ -1,0 +1,22 @@
+#
+# LUK the disks
+#
+
+- name: Encrypt OSDs
+  shell: cryptsetup -q luksFormat /dev/{{ item }}1 {{ encrypt_key_folder }}/{{ key_file }}
+  when: use_same_encrypt_key
+  tags:
+  - osds
+  - encrypt
+  with_items:
+  - "{{ osds }}"
+
+- name: Encrypt Journals
+  shell: cryptsetup -q luksFormat /dev/{{ item.0 }}{{ item.1}} {{ encrypt_key_folder }}/{{ key_file }}
+  when: use_same_encrypt_key
+  tags:
+  - journals
+  - encrypt
+  with_nested:
+  - "{{ journals }}"
+  - [ '2', '3', '4' ]

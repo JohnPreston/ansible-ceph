@@ -1,0 +1,14 @@
+#
+# Disks config
+#
+
+osds:
+- sdc
+- sdd
+
+journals:
+- sdb
+
+disks:
+- "{{ osds }}"
+- "{{ journals }}"
