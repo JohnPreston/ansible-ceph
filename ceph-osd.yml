@@ -1,0 +1,26 @@
+#
+#
+#
+
+- hosts:
+  - ceph-mon
+  tasks:
+  - name: create fake CEPH directory
+    shell: mkdir -p /etc/ceph/
+
+  - name: Gather keys
+    fetch: src="{{ item }}" dest=/etc/ceph/ flat=yes
+    with_items:
+    - "/etc/ceph/ceph.conf"
+    - "/etc/ceph/ceph.client.admin.keyring"
+
+- hosts:
+  - ceph-osd
+  vars_files:
+  - vars/osd.yml
+  roles:
+  - ceph-osd
+  vars:
+  - "orig_ceph_cluter_config_file" : "/root/ceph-cluster/ceph.conf"
+  - "encrypt_key_folder": "/var/tmp"
+  - "key_file": "luk-keyfile"
