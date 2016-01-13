@@ -24,17 +24,10 @@
   register: journals_blkids
   with_nested:
   - "{{ hostvars[ansible_hostname].journals  }}"
-  - [ '2', '3', '4' ]
+  - [ '2', '3' ]
   tags:
   - journals
   - os_config
-  when:
-  - "{{ hostvars[ansible_hostname].journals }}"
-
-- name: Debug Journals UUID
-  debug: msg="{{ item['stdout'] }}"
-  with_items:
-  - "{{ journals_blkids.results }}"
   when:
   - "{{ hostvars[ansible_hostname].journals }}"
 
@@ -64,13 +57,19 @@
   - ceph_config
   - osds
 
-- name: Debug CEPH OSD IDs
-  debug: msg="{{ item['stdout'] }}"
+- name: Debug OSD and Journal COUNTS
+  debug: msg="{{ item }}"
   with_items:
-  - "{{ ceph_osd_ids.results }}"
+  - "{{ hostvars[ansible_hostname].osds|length }}"
+  - "{{ journals_blkids.results|length }}"
   tags:
-  - osds
+  - os_config
+  - ceph
+  - journal
   - debug
+  when:
+  - "{{ hostvars[ansible_hostname].journals }}"
+
 
 - name: Create the OSD directories for OSDs
   shell: mkdir -p /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
@@ -89,6 +88,7 @@
   tags:
   - osds
   - os_config
+
 
 - name: Add fstab entries
   lineinfile: line="/dev/mapper/{{ item.0 }}_{{ item.1['stdout'] }}_crypt /var/lib/ceph/osd/ceph-{{ item.2['stdout'] }} xfs defaults 0 0" dest=/etc/fstab
@@ -123,3 +123,64 @@
   - "{{ ceph_osd_ids.results }}"
   tags:
   - os_config
+
+- name: Link OSD and journals
+  shell: ln -sf /dev/disk/by-partuuid/{{ item.0['stdout'] }} /var/lib/ceph/osd/ceph-{{ item.1['stdout'] }}/journal
+  with_together:
+  - "{{ journals_blkids.results }}"
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - os_config
+  - ceph
+  - journal
+  when:
+  - "{{ hostvars[ansible_hostname].journals }}"
+  - "{{ hostvars[ansible_hostname].osds|length }} == {{ journals_blkids.results|length }}"
+
+- name: Add CEPH udev rules
+  template: src=udev.j2 dest=/etc/udev/rules.d/95-ceph.rules
+  tags:
+  - os_config
+  - udev
+
+- name: Reload udev rules:
+  shell: udevadm control --reload-rules || udevadm trigger
+  tags:
+  - udev
+  - os_config
+
+- name: CEPH OSD create journal + FS + KEY
+  shell: ceph-osd -i {{ item['stdout'] }} --mkjournal --mkfs --mkkey
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - ceph
+  - osds
+  - profile
+
+- name: CEPH OSD allow OSD keyring
+  shell: ceph auth add osd.{{ item['stdout'] }} osd 'allow *' mon 'allow rwx' -i /var/lib/ceph/osd/ceph-{{ item['stdout'] }}/keyring
+  with_items:
+    - "{{ ceph_osd_ids.results }}"
+  tags:
+  - ceph
+  - osd
+  - keyring
+
+- name: CEPH OSD add to CRUSHMAP
+  shell: ceph osd crush add osd.{{ item['stdout'] }} 1.0  host={{ ansible_hostname }}
+
+- name: Ownership of the var - lib - ceph
+  shell: chown ceph:ceph /var/lib/ceph -R
+  tags:
+  - os_config
+  - ceph
+
+- name: Start CEPH OSDs
+  shell: systemctl start ceph-osd@{{ item['stdout'] }}
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - ceph
+  - start
+  - osd
