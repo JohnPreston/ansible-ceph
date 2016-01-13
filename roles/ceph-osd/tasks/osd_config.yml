@@ -143,12 +143,6 @@
   - os_config
   - udev
 
-- name: Reload udev rules:
-  shell: udevadm control --reload-rules || udevadm trigger
-  tags:
-  - udev
-  - os_config
-
 - name: CEPH OSD create journal + FS + KEY
   shell: ceph-osd -i {{ item['stdout'] }} --mkjournal --mkfs --mkkey
   with_items:
@@ -168,13 +162,21 @@
   - keyring
 
 - name: CEPH OSD add to CRUSHMAP
-  shell: ceph osd crush add osd.{{ item['stdout'] }} 1.0  host={{ ansible_hostname }}
+  shell: ceph osd crush add osd.{{ item['stdout'] }} 1.0  host={{ ansible_hostname }} root=default
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
 
 - name: Ownership of the var - lib - ceph
   shell: chown ceph:ceph /var/lib/ceph -R
   tags:
   - os_config
   - ceph
+
+- name: Reload udev rules
+  shell: udevadm control --reload-rules || udevadm trigger
+  tags:
+  - udev
+  - os_config
 
 - name: Start CEPH OSDs
   shell: systemctl start ceph-osd@{{ item['stdout'] }}
