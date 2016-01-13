@@ -14,7 +14,7 @@
 - name: Generate encryption file(s) for each disk
   shell: stat {{ encrypt_key_folder }}/{{ item }}-key 2>&1>/dev/null|| dd bs={{ encrypt_key_size }} count=4 if=/dev/urandom of={{ encrypt_key_folder }}/{{ item }}-key iflag=fullblock
   with_items:
-  - "{{ disks }}"
+  - "{{ hostvars[ansible_hostname]['osds'] }}"
   when:
   - not use_same_encrypt_key
 
@@ -25,5 +25,5 @@
 - name: Retrieve encryption key(s)
   fetch: src={{ encrypt_key_folder }}/{{ key_file }} dest=/var/tmp/{{ ansible_hostname }}-{{ item }}-key
   with_items:
-  - "{{ disks }}"
+  - "{{ hostvars[ansible_hostname]['osds'] }}"
   when: not use_same_encrypt_key

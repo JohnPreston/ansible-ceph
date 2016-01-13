@@ -9,14 +9,17 @@
   - osds
   - encrypt
   with_items:
-  - "{{ osds }}"
+  - "{{ hostvars[ansible_hostname]['osds'] }}"
 
 - name: Encrypt Journals
   shell: cryptsetup -q luksFormat /dev/{{ item.0 }}{{ item.1}} {{ encrypt_key_folder }}/{{ key_file }}
-  when: use_same_encrypt_key
+  when:
+  - use_same_encrypt_key
   tags:
   - journals
   - encrypt
   with_nested:
-  - "{{ journals }}"
+  - "{{ hostvars[ansible_hostname]['journals'] }}"
   - [ '2', '3', '4' ]
+  when:
+  - "{{ hostvars[ansible_hostname]['journals'] }}"

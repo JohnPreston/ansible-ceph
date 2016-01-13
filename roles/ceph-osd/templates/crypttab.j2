@@ -1,0 +1,7 @@
+{%for journal in hostvars[ansible_hostname].journals %}
+{% set id  = 2 %}
+{% for uuid in journals_blkids.results %}
+{{ journal }}_{{ id }}_crypt /dev/disk/by-partuuid/{{ uuid.stdout }} {{ encrypt_key_folder }}/{{ key_file }} luks
+{% set id = id + 1 %}
+{% endfor %}
+{% endfor %}

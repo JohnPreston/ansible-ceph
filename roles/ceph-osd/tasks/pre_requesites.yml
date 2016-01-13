@@ -1,0 +1,21 @@
+#
+# CEPH repo and packages
+#
+
+- name: Install CEPH repo file
+  copy: src=ceph.repo dest=/etc/yum.repos.d/ceph.repo
+  tags:
+  - ceph
+  - install
+
+- name: Add CEPH repo key
+  shell: sudo rpm --import 'https://download.ceph.com/keys/release.asc'
+  tags:
+  - ceph
+  - install
+
+- name: Install CEPH packages
+  yum: name=ceph state=latest
+  tags:
+  - ceph
+  - install

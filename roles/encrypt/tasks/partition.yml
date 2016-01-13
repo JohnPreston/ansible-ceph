@@ -1,11 +1,11 @@
 #
-#
+# Creates the partitions
 #
 
 - name: Create OSD partition
   shell: parted -s /dev/{{ item }} mklabel gpt mkpart primary 1MB 100%
   with_items:
-  - "{{ osds }}"
+  - "{{ hostvars[ansible_hostname]['osds'] }}"
   ignore_errors: True
   tags:
   - osds
@@ -14,16 +14,20 @@
 - name: Create Journal primary partitions
   shell: parted -s /dev/{{ item }} mklabel gpt mkpart primary 1MB 25G
   with_items:
-  - "{{ journals }}"
+  - "{{ hostvars[ansible_hostname]['journals'] }}"
   tags:
   - journals
   - format
+  when:
+  - "{{ hostvars[ansible_hostname]['journals']}}"
 
 - name: Create multiple partitions for journals
   shell: parted -s /dev/{{ item.0 }} mkpart extended {{ item.1['start'] }} {{ item.1['end'] }}
   with_nested:
-  - "{{ journals }}"
+  - "{{ hostvars[ansible_hostname]['journals'] }}"
   - [ {'start': "25G", 'end': "50G"}, {'start': "50G", 'end': "75G"}, {'start': "75G", 'end': "100G"} ]
   tags:
   - journals
   - format
+  when:
+  - " {{ hostvars[ansible_hostname]['journals']}}"

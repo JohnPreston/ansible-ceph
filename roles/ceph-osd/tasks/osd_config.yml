@@ -1,0 +1,125 @@
+#
+# OSD config
+#
+- name: Debug OSDs
+  debug: msg="{{ hostvars[ansible_hostname]['osds'] }}"
+  tags:
+  - debug
+  - osds
+
+- name: Copy the CEPH config file to the OSD host
+  copy: src={{ orig_ceph_cluter_config_file }} dest={{ ceph_default_dir }}/{{ ceph_cluster_config_file }}
+  tags:
+  - osds
+  - ceph_config
+
+- name: Copy the ceph admin keyring to the OSD host
+  copy: src={{ ceph_default_dir}}/{{ ceph_admin_keyring_file }} dest={{ ceph_default_dir }}/{{ ceph_admin_keyring_file }}
+  tags:
+  - osds
+  - ceph_config
+
+- name: Get the Journals part UUID
+  shell: blkid | sort -k 1 | grep {{ item.0 }}{{ item.1 }} | awk -F=\" '{print $5}'| sed 's/\"//g'
+  register: journals_blkids
+  with_nested:
+  - "{{ hostvars[ansible_hostname].journals  }}"
+  - [ '2', '3', '4' ]
+  tags:
+  - journals
+  - os_config
+  when:
+  - "{{ hostvars[ansible_hostname].journals }}"
+
+- name: Debug Journals UUID
+  debug: msg="{{ item['stdout'] }}"
+  with_items:
+  - "{{ journals_blkids.results }}"
+  when:
+  - "{{ hostvars[ansible_hostname].journals }}"
+
+- name: Create crypttab entries for journals
+  template: src=crypttab.j2 dest=/etc/crypttab
+  tags:
+  - journals
+  - os_config
+  when:
+  - "{{ hostvars[ansible_hostname].journals }}"
+
+- name: Get the OSDS part UUID
+  shell: blkid | sort -k 1 | grep {{ item }}1 | awk -F=\" '{print $5}'| sed 's/\"//g'
+  register: osds_blkids
+  with_items:
+  - "{{ hostvars[ansible_hostname].osds  }}"
+  tags:
+  - osds
+  - os_config
+
+- name: CEPH create OSD
+  shell: ceph osd create
+  with_flattened:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  register: ceph_osd_ids
+  tags:
+  - ceph_config
+  - osds
+
+- name: Debug CEPH OSD IDs
+  debug: msg="{{ item['stdout'] }}"
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - osds
+  - debug
+
+- name: Create the OSD directories for OSDs
+  shell: mkdir -p /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - osds
+  - os_config
+
+- name: Add crypttab entries
+  lineinfile: line="{{ item.0 }}_{{ item.1['stdout']}}_crypt /dev/disk/by-partuuid/{{ item.2['stdout'] }} {{ encrypt_key_folder }}/{{ key_file }} luks" dest=/etc/crypttab
+  with_together:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  - "{{ ceph_osd_ids.results }}"
+  - "{{ osds_blkids.results }}"
+  tags:
+  - osds
+  - os_config
+
+- name: Add fstab entries
+  lineinfile: line="/dev/mapper/{{ item.0 }}_{{ item.1['stdout'] }}_crypt /var/lib/ceph/osd/ceph-{{ item.2['stdout'] }} xfs defaults 0 0" dest=/etc/fstab
+  with_together:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  - "{{ ceph_osd_ids.results }}"
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - osds
+  - os_config
+
+- name: Open the OSD luks
+  shell: cryptsetup -d {{ encrypt_key_folder}}/{{ key_file }} luksOpen /dev/{{ item.0 }}1 osd{{ item.1['stdout'] }}
+  with_together:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - osds
+  - LUKS
+
+- name: Format XFS OSDs mapped by LUKS
+  shell: mkfs.xfs /dev/mapper/osd{{ item['stdout'] }} -f
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - osds
+  - format
+
+- name: Mount OSDs to their directory
+  shell: mount /dev/mapper/osd{{ item['stdout'] }} /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+  tags:
+  - os_config
