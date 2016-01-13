@@ -1,0 +1,7 @@
+#
+#
+#
+
+ceph_default_dir: /etc/ceph
+ceph_admin_keyring_file: ceph.client.admin.keyring
+ceph_cluster_config_file: ceph.conf

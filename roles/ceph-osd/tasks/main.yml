@@ -1,0 +1,71 @@
+#
+#
+#
+
+- name: Debug OSDs
+  debug: msg="{{ hostvars[ansible_hostname]['osds'] }}"
+
+- name: Copy the CEPH config file to the OSD host
+  copy: src={{ orig_ceph_cluter_config_file }} dest={{ ceph_default_dir }}/{{ ceph_cluster_config_file }}
+
+- name: Copy the ceph admin keyring to the OSD host
+  copy: src={{ ceph_default_dir}}/{{ ceph_admin_keyring_file }} dest={{ ceph_default_dir }}/{{ ceph_admin_keyring_file }}
+
+- name: CEPH create OSD
+  shell: ceph osd create
+  with_flattened:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  register: ceph_osd_ids
+  tags:
+  - ceph
+  - osds
+  - create
+
+- name: Debug CEPH OSD IDs
+  debug: msg="{{ item['stdout'] }}"
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+
+- name: Create the OSD directories for OSDs
+  shell: mkdir -p /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
+  with_items:
+  - "{{ ceph_osd_ids.results }}"
+
+# - name: Mount OSDs to their directory
+#   shell: mount /dev/mapper/osd{{ item['stdout'] }} /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
+#   with_items:
+#   - "{{ ceph_osd_ids.results }}"
+
+- name: Rescan host
+  setup:
+
+- name: Get the part UUID
+  shell: blkid | sort -k 1 | grep {{ item }}1 | awk -F=\" '{print $5}'| sed 's/\"//g'
+  register: osds_blkids
+  with_items:
+  - "{{ hostvars[ansible_hostname].osds  }}"
+
+- name: Add crypttab entries
+  lineinfile: line="{{ item.0 }}_{{ item.1['stdout']}}_crypt /dev/disk/by-partuuid/{{ item.2['stdout'] }} {{ encrypt_key_folder }}/{{ key_file }} luks" dest=/etc/crypttab
+  with_together:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  - "{{ ceph_osd_ids.results }}"
+  - "{{ osds_blkids.results }}"
+
+- name: Add fstab entries
+  lineinfile: line="/dev/mapper/{{ item.0 }}_{{ item.1['stdout'] }}_crypt /var/lib/ceph/osd/ceph-{{ item.2['stdout'] }} xfs defaults 0 0" dest=/etc/fstab
+  with_together:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  - "{{ ceph_osd_ids.results }}"
+  - "{{ ceph_osd_ids.results }}"
+
+- name: Open the OSD luks
+  shell: cryptsetup -d {{ encrypt_key_folder}}/{{ key_file }} luksOpen /dev/{{ item.0 }}1 osd{{ item.1['stdout'] }}
+  with_together:
+  - "{{ hostvars[ansible_hostname].osds }}"
+  - "{{ ceph_osd_ids.results }}"
+
+- name: Format XFS OSDs mapped by LUKS
+  shell: mkfs.xfs /dev/mapper/osd{{ item['stdout'] }} -f
+  with_items:
+  - "{{ ceph_osd_ids.results }}"

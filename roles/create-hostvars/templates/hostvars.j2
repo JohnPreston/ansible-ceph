@@ -1,0 +1,18 @@
+
+osds:
+{% for device in hostvars[inventory_hostname]['ansible_devices'] %}
+{% if hostvars[inventory_hostname]['ansible_devices'][device].partitions|length < 2 %}
+{% if hostvars[inventory_hostname]['ansible_devices'][device].rotational == "1" %}
+- {{ device }}
+{% endif %}
+{% endif %}
+{% endfor %}
+
+journals:
+{% for device in hostvars[inventory_hostname]['ansible_devices'] %}
+{% if hostvars[inventory_hostname]['ansible_devices'][device].partitions|length < 2 %}
+{% if hostvars[inventory_hostname]['ansible_devices'][device].rotational == "0" %}
+- {{ device }}
+{% endif %}
+{% endif %}
+{% endfor %}

@@ -1,0 +1,10 @@
+#
+# Role to automatically generate hosts vars for all the OSD disks
+#
+
+- name: Template hostvars
+  template: src=hostvars.j2 dest="/var/tmp/{{ ansible_hostname }}"
+
+- name: Get template in inventory
+  fetch: src="/var/tmp/{{ ansible_hostname }}" dest="./inventory/hosts_vars/{{ ansible_hostname }}" flat=yes
+
