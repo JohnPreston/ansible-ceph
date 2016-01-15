@@ -91,7 +91,7 @@
 
 
 - name: Add fstab entries
-  lineinfile: line="/dev/mapper/{{ item.0 }}_{{ item.1['stdout'] }}_crypt /var/lib/ceph/osd/ceph-{{ item.2['stdout'] }} xfs defaults 0 0" dest=/etc/fstab
+  lineinfile: line="/dev/mapper/{{ item.0 }}_{{ item.1['stdout'] }}_crypt /var/lib/ceph/osd/ceph-{{ item.2['stdout'] }} xfs defaults,rw,noatime,inode64 0 0" dest=/etc/fstab
   with_together:
   - "{{ hostvars[ansible_hostname].osds }}"
   - "{{ ceph_osd_ids.results }}"
@@ -118,7 +118,7 @@
   - format
 
 - name: Mount OSDs to their directory
-  shell: mount /dev/mapper/osd{{ item['stdout'] }} /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
+  shell: mount -o  rw,noatime,inode64 /dev/mapper/osd{{ item['stdout'] }} /var/lib/ceph/osd/ceph-{{ item['stdout'] }}
   with_items:
   - "{{ ceph_osd_ids.results }}"
   tags:
